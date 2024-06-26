@@ -34,9 +34,9 @@ public class FilterConfig {
                                 .addResponseHeader("chat-response", "chat-response-header"))
                                 //.filter(headerFilter.apply(new AuthorizationHeaderFilter.Config())))
                         .uri("http://localhost:8083"))
-                .route(r -> r.path("/caselaw-service/**")
-                        .filters(f -> f.addRequestHeader("caselaw-request", "caselaw-request-header")
-                                .addResponseHeader("caselaw-response", "caselaw-response-header"))
+                .route(r -> r.path("/manage-service/**")
+                        .filters(f -> f.addRequestHeader("manage-request", "manage-request-header")
+                                .addResponseHeader("manage-response", "manage-response-header"))
                                 //.filter(headerFilter.apply(new AuthorizationHeaderFilter.Config())))
                         .uri("http://localhost:8084"))
                 .build();

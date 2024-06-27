@@ -1,4 +1,4 @@
-package site.lawmate.gatewayservice.config;
+package site.lawmate.gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

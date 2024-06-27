@@ -54,6 +54,7 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
+	implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-reactor-resilience4j'
 	// actuator
 	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: '3.3.1'
 

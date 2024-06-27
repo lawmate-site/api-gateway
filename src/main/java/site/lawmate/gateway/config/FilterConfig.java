@@ -1,11 +1,11 @@
-package site.lawmate.gatewayservice.config;
+package site.lawmate.gateway.config;
 
 import lombok.AllArgsConstructor;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
-import site.lawmate.gatewayservice.filter.AuthorizationHeaderFilter;
+import site.lawmate.gateway.filter.AuthorizationHeaderFilter;
 
 @Component
 @AllArgsConstructor

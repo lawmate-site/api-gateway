@@ -1,4 +1,4 @@
-package site.lawmate.gatewayservice.router;
+package site.lawmate.gateway.router;
 
 import lombok.Getter;
 import lombok.Setter;

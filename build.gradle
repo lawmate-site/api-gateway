@@ -27,13 +27,12 @@ ext {
 	set('springCloudVersion', "2023.0.2")
 }
 
-bootJar {
-	enabled = false
-}
 
-jar {
+bootJar{
 	enabled = true
-
+}
+jar {
+	enabled = false
 }
 
 dependencies {
@@ -83,6 +82,9 @@ dependencies {
 
 	// Redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+
+	// config
+	implementation 'org.springframework.cloud:spring-cloud-starter-config'
 }
 
 dependencyManagement {

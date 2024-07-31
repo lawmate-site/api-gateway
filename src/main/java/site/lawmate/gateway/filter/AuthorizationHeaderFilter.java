@@ -1,105 +1,66 @@
 package site.lawmate.gateway.filter;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.List;
+import java.util.Objects;
+
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Set;
+import site.lawmate.gateway.domain.vo.ExceptionStatus;
+import site.lawmate.gateway.domain.vo.Role;
+import site.lawmate.gateway.exception.GatewayException;
+import site.lawmate.gateway.provider.JwtTokenProvider;
 
 @Slf4j
 @Component
 public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<AuthorizationHeaderFilter.Config> { //게이트웨이에서 filter를 생산
-    //    Environment env;
-//
-//    public AuthorizationHeaderFilter(Environment env) {
-//        super(Config.class);
-//        this.env = env;
-//    }
-    @Value("${jwt.secret}")
-    private String secretValue;
+    private final JwtTokenProvider jwtTokenProvider;
 
+    public AuthorizationHeaderFilter(JwtTokenProvider jwtTokenProvider){
+        super(Config.class);
+        this.jwtTokenProvider = jwtTokenProvider;
+    }
+
+    @Data
     public static class Config {
-        // Put configuration properties here
+        private String headerName;
+        private String headerValue;
+        private List<Role> roles;
     }
 
     @Override
     public GatewayFilter apply(Config config) {
-        return (exchange, chain) -> {
-            ServerHttpRequest request = exchange.getRequest();
-
-//            if (!request.getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
-//                return onError(exchange, "No authorization header", HttpStatus.UNAUTHORIZED);
-//            }
-
-            HttpHeaders headers = request.getHeaders();
-            Set<String> keys = headers.keySet();
-            log.info(">>>");
-            keys.stream().forEach(v -> {
-                log.info(v + "=" + request.getHeaders().get(v));
-            });
-            log.info("<<<");
-
-//            String authorizationHeader = request.getHeaders().get(HttpHeaders.AUTHORIZATION).get(0);
-//            String jwt = authorizationHeader.replace("Bearer", "");
-
-            // Create a cookie object
-//            ServerHttpResponse response = exchange.getResponse();
-//            ResponseCookie c1 = ResponseCookie.from("my_token", "test1234").maxAge(60 * 60 * 24).build();
-//            response.addCookie(c1);
-
-//            if (!isJwtValid(jwt)) {
-//                return onError(exchange, "JWT token is not valid", HttpStatus.UNAUTHORIZED);
-//            }
-
-            return chain.filter(exchange);
-        };
+        return ((exchange, chain) -> //exchange : 요청, 응답을 가지고 있는 객체, chain : 다음 필터로 요청을 넘기는 역할
+                Mono.just(exchange)
+                        .flatMap(i -> Mono.just(Objects.requireNonNull(exchange.getRequest().getHeaders().get(HttpHeaders.AUTHORIZATION))))
+                        .flatMap(i -> Mono.just(i.get(0)))
+                        .switchIfEmpty(Mono.error(new GatewayException(ExceptionStatus.UNAUTHORIZED,"No Authorization Header")))
+                        .filterWhen(i -> Mono.just(i.startsWith("Bearer ")))
+                        .flatMap(i -> Mono.just(jwtTokenProvider.removeBearer(i)))
+                        .filterWhen(i -> Mono.just(jwtTokenProvider.isTokenValid(i, false)))
+                        .switchIfEmpty(Mono.error(new GatewayException(ExceptionStatus.UNAUTHORIZED,"Invalid Token")))
+                        .flatMapMany(i -> Flux.just(jwtTokenProvider.extractRoles(i).stream().map(Role::valueOf).findAny().orElseGet(() -> Role.ROLE_GUEST)))
+                        .any(config.getRoles()::contains)
+                        .filter(i -> i)
+                        .switchIfEmpty(Mono.error(new GatewayException(ExceptionStatus.NO_PERMISSION, "No Permission")))
+                        .flatMap(i -> chain.filter(exchange))
+                        .onErrorResume(GatewayException.class, e -> onError(exchange, HttpStatusCode.valueOf(e.getStatus().getStatus().value()), e.getMessage()))
+                        .log()
+        );
     }
 
-    private Mono<Void> onError(ServerWebExchange exchange, String err, HttpStatus httpStatus) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(httpStatus);
-        log.error(err);
-
-        byte[] bytes = "The requested token is invalid.".getBytes(StandardCharsets.UTF_8);
-        DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
-        return response.writeWith(Flux.just(buffer));
-
-//        return response.setComplete();
-    }
-
-    private boolean isJwtValid(String jwt) {
-//       byte[] secretKeyBytes = Base64.getEncoder().encode(secretValue.getBytes());
-//       SecretKey signingKey = new SecretKeySpec(secretKeyBytes, SignatureAlgorithm.HS512.getJcaName());
-
-        boolean returnValue = true;
-        String subject = null;
-
-        try {
-            // JwtParser jwtParser = Jwts.parserBuilder()
-            //         .setSigningKey(signingKey)
-            //         .build();
-
-            // subject = jwtParser.parseClaimsJws(jwt).getBody().getSubject();
-        } catch (Exception ex) {
-            returnValue = false;
-        }
-
-        if (subject == null || subject.isEmpty()) {
-            returnValue = false;
-        }
-
-        return returnValue;
+    private Mono<Void> onError(ServerWebExchange exchange, HttpStatusCode httpStatusCode, String message){
+        log.error("Error Occured : {}, {}, {}", exchange.getRequest().getURI(), httpStatusCode, message);
+        exchange.getResponse().setStatusCode(httpStatusCode);
+        return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(message.getBytes())));
     }
 
 }
